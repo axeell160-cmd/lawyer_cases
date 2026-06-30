@@ -15,6 +15,7 @@ from enum import Enum
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Text
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -104,6 +105,14 @@ app = FastAPI(
     title="Реестр судебных дел",
     description="Минимальное API для ведения реестра судебных дел юриста",
     version="1.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
