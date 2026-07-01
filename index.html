@@ -284,12 +284,12 @@
   <div class="api-bar">
     <span class="api-dot" id="apiDot"></span>
     <label class="utility">API</label>
-    <input id="apiUrl" type="text" placeholder="https://ваш-сервер.example.com" />
+    <input id="apiUrl" type="text" value="https://lawyer-cases.onrender.com" />
     <button class="btn secondary" style="padding:6px 12px; font-size:12px;" onclick="checkApi()">Проверить</button>
   </div>
 
   <div class="toolbar">
-    <input type="text" id="searchInput" placeholder="Поиск по клиенту…" oninput="loadCases()" />
+    <input type="text" id="searchInput" placeholder="Поиск по клиенту или номеру дела…" oninput="loadCases()" />
     <select id="statusFilter" onchange="loadCases()">
       <option value="">Все статусы</option>
       <option value="open">В производстве</option>
@@ -311,12 +311,12 @@
     <input type="hidden" id="caseId" />
 
     <div class="field">
-      <label>Номер дела</label>
+      <label>Номер дела *</label>
       <input id="f_case_number" type="text" placeholder="А40-12345/2026" />
     </div>
 
     <div class="field">
-      <label>Клиент</label>
+      <label>Клиент *</label>
       <input id="f_client_name" type="text" placeholder="ФИО или организация" />
     </div>
 
@@ -328,6 +328,17 @@
       <div class="field">
         <label>Суд</label>
         <input id="f_court_name" type="text" />
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Судья</label>
+        <input id="f_judge_name" type="text" />
+      </div>
+      <div class="field">
+        <label>Сумма иска (руб)</label>
+        <input id="f_claim_amount" type="number" />
       </div>
     </div>
 
@@ -353,6 +364,11 @@
       <textarea id="f_description" placeholder="Краткое описание…"></textarea>
     </div>
 
+    <div class="field">
+      <label>Ответственный</label>
+      <input id="f_responsible" type="text" placeholder="Ваше ФИО" />
+    </div>
+
     <div class="msg" id="modalMsg"></div>
 
     <div class="modal-actions">
@@ -366,7 +382,7 @@
 </div>
 
 <script>
-let apiBase = '';
+let apiBase = 'https://lawyer-cases.onrender.com';
 
 const statusLabels = {
   open: 'В производстве',
@@ -376,15 +392,16 @@ const statusLabels = {
   closed: 'Закрыто'
 };
 
-document.getElementById('apiUrl').addEventListener('change', (e) => {
-  apiBase = e.target.value.replace(/\/$/, '');
-  checkApi();
-});
+const statusColors = {
+  open: 'open',
+  in_court: 'in_court',
+  appeal: 'appeal',
+  suspended: 'suspended',
+  closed: 'closed'
+};
 
 async function checkApi(){
-  apiBase = document.getElementById('apiUrl').value.replace(/\/$/, '');
   const dot = document.getElementById('apiDot');
-  if(!apiBase){ dot.className = 'api-dot'; return; }
   try{
     const res = await fetch(apiBase + '/');
     if(res.ok){
@@ -399,41 +416,47 @@ async function checkApi(){
 }
 
 async function loadCases(){
-  if(!apiBase) return;
   const status = document.getElementById('statusFilter').value;
-  const client = document.getElementById('searchInput').value;
+  const search = document.getElementById('searchInput').value.trim();
+  
   const params = new URLSearchParams();
   if(status) params.set('status', status);
-  if(client) params.set('client_name', client);
+  if(search) {
+    params.set('client_name', search);
+    params.set('case_number', search);
+  }
 
   const list = document.getElementById('list');
   try{
     const res = await fetch(apiBase + '/cases?' + params.toString());
-    if(!res.ok) throw new Error('bad response');
+    if(!res.ok) throw new Error('Ошибка сервера');
     const data = await res.json();
-    renderList(data);
+    renderList(data.items || data);
   }catch(e){
-    list.innerHTML = `<div class="empty"><div class="mark">Нет связи</div>Не удаётся получить данные с сервера. Проверьте адрес API выше.</div>`;
+    list.innerHTML = `<div class="empty"><div class="mark">Нет связи</div>Не удаётся получить данные.<br>Проверьте, что сервер запущен.</div>`;
   }
 }
 
 function renderList(cases){
   const list = document.getElementById('list');
-  if(!cases.length){
-    list.innerHTML = `<div class="empty"><div class="mark">Пусто</div>Дел не найдено. Добавьте первое дело кнопкой выше.</div>`;
+  if(!cases || cases.length === 0){
+    list.innerHTML = `<div class="empty"><div class="mark">Пусто</div>Дел не найдено. Добавьте первое дело.</div>`;
     return;
   }
+  
   list.innerHTML = cases.map(c => `
     <div class="case-card" onclick='openModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
       <div class="row1">
         <span class="num utility">№ ${escapeHtml(c.case_number)}</span>
-        <span class="badge ${c.status}">${statusLabels[c.status] || c.status}</span>
+        <span class="badge ${statusColors[c.status] || 'open'}">${statusLabels[c.status] || c.status}</span>
       </div>
       <h3>${escapeHtml(c.client_name)}</h3>
       <div class="meta">
         ${c.court_name ? `<span>${escapeHtml(c.court_name)}</span>` : ''}
         ${c.opposing_party ? `<span>против: ${escapeHtml(c.opposing_party)}</span>` : ''}
+        ${c.judge_name ? `<span>судья: ${escapeHtml(c.judge_name)}</span>` : ''}
         ${c.next_hearing_date ? `<span>заседание: ${c.next_hearing_date}</span>` : ''}
+        ${c.claim_amount ? `<span>${c.claim_amount.toLocaleString('ru-RU')} ₽</span>` : ''}
       </div>
     </div>
   `).join('');
@@ -441,21 +464,26 @@ function renderList(cases){
 
 function escapeHtml(str){
   if(!str) return '';
-  return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
 function openModal(c){
   document.getElementById('modalMsg').textContent = '';
-  if(c){
+  const isEdit = !!c;
+  
+  if(isEdit){
     document.getElementById('modalTitle').textContent = 'Дело №' + c.case_number;
     document.getElementById('caseId').value = c.id;
     document.getElementById('f_case_number').value = c.case_number || '';
     document.getElementById('f_client_name').value = c.client_name || '';
     document.getElementById('f_opposing_party').value = c.opposing_party || '';
     document.getElementById('f_court_name').value = c.court_name || '';
+    document.getElementById('f_judge_name').value = c.judge_name || '';
+    document.getElementById('f_claim_amount').value = c.claim_amount || '';
     document.getElementById('f_status').value = c.status || 'open';
     document.getElementById('f_next_hearing_date').value = c.next_hearing_date || '';
     document.getElementById('f_description').value = c.description || '';
+    document.getElementById('f_responsible').value = c.responsible || '';
     document.getElementById('deleteBtn').style.display = 'inline-block';
   } else {
     document.getElementById('modalTitle').textContent = 'Новое дело';
@@ -464,9 +492,12 @@ function openModal(c){
     document.getElementById('f_client_name').value = '';
     document.getElementById('f_opposing_party').value = '';
     document.getElementById('f_court_name').value = '';
+    document.getElementById('f_judge_name').value = '';
+    document.getElementById('f_claim_amount').value = '';
     document.getElementById('f_status').value = 'open';
     document.getElementById('f_next_hearing_date').value = '';
     document.getElementById('f_description').value = '';
+    document.getElementById('f_responsible').value = '';
     document.getElementById('deleteBtn').style.display = 'none';
   }
   document.getElementById('overlay').classList.add('show');
@@ -477,64 +508,78 @@ function closeModal(){
 }
 
 async function saveCase(){
-  if(!apiBase){
-    document.getElementById('modalMsg').textContent = 'Сначала укажите адрес API выше.';
-    document.getElementById('modalMsg').className = 'msg error';
-    return;
-  }
   const id = document.getElementById('caseId').value;
   const payload = {
-    case_number: document.getElementById('f_case_number').value,
-    client_name: document.getElementById('f_client_name').value,
-    opposing_party: document.getElementById('f_opposing_party').value || null,
-    court_name: document.getElementById('f_court_name').value || null,
+    case_number: document.getElementById('f_case_number').value.trim(),
+    client_name: document.getElementById('f_client_name').value.trim(),
+    opposing_party: document.getElementById('f_opposing_party').value.trim() || null,
+    court_name: document.getElementById('f_court_name').value.trim() || null,
+    judge_name: document.getElementById('f_judge_name').value.trim() || null,
+    claim_amount: parseInt(document.getElementById('f_claim_amount').value) || null,
     status: document.getElementById('f_status').value,
     next_hearing_date: document.getElementById('f_next_hearing_date').value || null,
-    description: document.getElementById('f_description').value || null
+    description: document.getElementById('f_description').value.trim() || null,
+    responsible: document.getElementById('f_responsible').value.trim() || null
   };
+
   if(!payload.case_number || !payload.client_name){
-    document.getElementById('modalMsg').textContent = 'Укажите номер дела и клиента.';
-    document.getElementById('modalMsg').className = 'msg error';
+    showModalMsg('Укажите номер дела и клиента.', 'error');
     return;
   }
+
   try{
     const url = id ? `${apiBase}/cases/${id}` : `${apiBase}/cases`;
     const method = id ? 'PUT' : 'POST';
+    
     const res = await fetch(url, {
-      method,
+      method: method,
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload)
     });
+
     if(!res.ok){
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || 'Ошибка сохранения');
+      throw new Error(err.detail || 'Ошибка при сохранении');
     }
-    closeModal();
-    loadCases();
+
+    showModalMsg('Сохранено успешно!', 'ok');
+    setTimeout(() => {
+      closeModal();
+      loadCases();
+    }, 800);
   }catch(e){
-    document.getElementById('modalMsg').textContent = e.message;
-    document.getElementById('modalMsg').className = 'msg error';
+    showModalMsg(e.message, 'error');
   }
+}
+
+function showModalMsg(text, type){
+  const msgEl = document.getElementById('modalMsg');
+  msgEl.textContent = text;
+  msgEl.className = `msg ${type}`;
 }
 
 async function deleteCase(){
   const id = document.getElementById('caseId').value;
-  if(!id || !apiBase) return;
-  if(!confirm('Удалить это дело без возможности восстановления?')) return;
+  if(!id) return;
+  if(!confirm('Удалить это дело?')) return;
+
   try{
     const res = await fetch(`${apiBase}/cases/${id}`, {method: 'DELETE'});
     if(!res.ok) throw new Error('Не удалось удалить');
     closeModal();
     loadCases();
   }catch(e){
-    document.getElementById('modalMsg').textContent = e.message;
-    document.getElementById('modalMsg').className = 'msg error';
+    showModalMsg(e.message, 'error');
   }
 }
 
-document.getElementById('overlay').addEventListener('click', (e) => {
-  if(e.target.id === 'overlay') closeModal();
-});
+// Инициализация
+window.onload = () => {
+  checkApi();
+  document.getElementById('overlay').addEventListener('click', (e) => {
+    if(e.target.id === 'overlay') closeModal();
+  });
+};
 </script>
 
 </body>
