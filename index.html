@@ -7,144 +7,134 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; }
-    .notion-page { max-width: 900px; margin: 0 auto; }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #1e40af; font-weight: 600; }
   </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50">
 
 <div class="flex h-screen">
   <!-- Sidebar -->
-  <div class="w-72 bg-white border-r border-gray-200 p-4 flex flex-col">
-    <h1 class="font-semibold text-xl mb-8 px-3">Судебные дела</h1>
-    
-    <div class="space-y-1 mb-8">
-      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-600 font-medium">
-        <i class="fas fa-folder"></i> Все дела
-      </a>
-      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100">
-        <i class="fas fa-calendar"></i> Календарь
-      </a>
-      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100">
-        <i class="fas fa-archive"></i> Архив
-      </a>
-    </div>
-
-    <button onclick="openNewCaseModal()" 
-            class="w-full bg-blue-600 text-white py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700">
+  <div class="w-72 bg-white border-r p-6 flex flex-col">
+    <h1 class="text-2xl font-bold mb-8">Судебные дела</h1>
+    <button onclick="newCase()" class="w-full bg-blue-600 text-white py-3 rounded-2xl flex items-center justify-center gap-2 mb-8">
       <i class="fas fa-plus"></i> Новое дело
     </button>
-  </div>
-
-  <!-- Main Content -->
-  <div class="flex-1 overflow-auto">
-    <div class="max-w-4xl mx-auto p-8">
-      <h2 class="text-3xl font-semibold mb-8">Все дела</h2>
-
-      <div id="cases-list" class="space-y-3"></div>
+    <div class="space-y-1 text-gray-600">
+      <div class="px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-medium">Все дела</div>
     </div>
   </div>
 
-  <!-- Right Sidebar / Preview -->
-  <div id="case-detail" class="w-96 bg-white border-l border-gray-200 hidden overflow-auto">
-    <div class="p-6 sticky top-0 bg-white border-b">
-      <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600">
-        <i class="fas fa-times text-xl"></i>
-      </button>
-    </div>
-    <div id="detail-content" class="p-6"></div>
+  <!-- Cases List -->
+  <div class="flex-1 p-8 overflow-auto">
+    <h2 class="text-3xl font-semibold mb-8">Мои дела</h2>
+    <div id="cases-list" class="space-y-4"></div>
   </div>
-</div>
 
-<!-- New Case Modal -->
-<div id="new-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
-  <div class="bg-white rounded-3xl p-8 w-full max-w-md">
-    <h3 class="text-2xl font-semibold mb-6">Новое судебное дело</h3>
-    <!-- Форма здесь -->
-    <button onclick="createCase()" class="w-full bg-blue-600 text-white py-4 rounded-2xl">Создать дело</button>
+  <!-- Detail Panel -->
+  <div id="detail-panel" class="w-2/5 bg-white border-l shadow-xl overflow-auto hidden flex-col">
+    <div class="p-6 border-b flex items-center justify-between bg-white sticky top-0 z-10">
+      <h2 id="detail-title" class="text-2xl font-semibold"></h2>
+      <button onclick="closeDetail()" class="text-gray-400 hover:text-red-500"><i class="fas fa-times text-2xl"></i></button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b px-6">
+      <button onclick="switchTab(0)" id="tab-0" class="tab-active px-6 py-4">Информация</button>
+      <button onclick="switchTab(1)" id="tab-1" class="px-6 py-4 text-gray-500 hover:text-gray-700">Документы</button>
+      <button onclick="switchTab(2)" id="tab-2" class="px-6 py-4 text-gray-500 hover:text-gray-700">Контакты</button>
+      <button onclick="switchTab(3)" id="tab-3" class="px-6 py-4 text-gray-500 hover:text-gray-700">Задачи</button>
+    </div>
+
+    <!-- Tab Content -->
+    <div id="tab-content" class="flex-1 p-6 overflow-auto"></div>
   </div>
 </div>
 
 <script>
 let apiBase = "https://lawyer-cases.onrender.com";
-let currentCases = [];
+let currentCase = null;
+let currentTab = 0;
 
 async function loadCases() {
-  try {
-    const res = await fetch(apiBase + '/cases');
-    currentCases = await res.json();
-    renderCases();
-  } catch(e) {}
+  const res = await fetch(apiBase + '/cases');
+  const cases = await res.json();
+  renderCases(cases);
 }
 
-function renderCases() {
-  const container = document.getElementById('cases-list');
-  container.innerHTML = currentCases.map(c => `
-    <div onclick="openCaseDetail(${c.id})" class="bg-white border border-gray-200 rounded-2xl p-5 hover:border-blue-300 cursor-pointer flex gap-4">
-      <div class="flex-1">
-        <div class="font-medium">${c.case_number}</div>
-        <div class="text-lg font-semibold mt-1">${c.client_name}</div>
-        ${c.next_hearing_date ? `<div class="text-sm text-gray-500 mt-2">Заседание: ${c.next_hearing_date}</div>` : ''}
-      </div>
-      <div class="text-right">
-        <span class="inline-block px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">${c.status}</span>
+function renderCases(cases) {
+  const html = cases.map(c => `
+    <div onclick="openDetail(${c.id})" class="bg-white border border-gray-200 hover:border-blue-300 rounded-3xl p-6 cursor-pointer">
+      <div class="flex justify-between">
+        <div>
+          <span class="font-mono text-sm text-gray-400">${c.case_number}</span>
+          <div class="font-semibold text-xl mt-1">${c.client_name}</div>
+        </div>
+        <span class="text-xs px-4 py-2 bg-blue-100 text-blue-700 rounded-full">${c.status}</span>
       </div>
     </div>
   `).join('');
+  document.getElementById('cases-list').innerHTML = html || '<p class="text-center text-gray-400 py-12">Дел пока нет</p>';
 }
 
-function openCaseDetail(id) {
-  const caseData = currentCases.find(c => c.id === id);
-  if (!caseData) return;
-
-  document.getElementById('case-detail').classList.remove('hidden');
-  document.getElementById('detail-content').innerHTML = `
-    <div class="notion-page">
-      <h1 class="text-4xl font-semibold mb-2">${caseData.case_number}</h1>
-      <p class="text-2xl text-gray-600">${caseData.client_name}</p>
-      
-      <div class="mt-10 grid grid-cols-2 gap-8">
-        <div>
-          <h3 class="font-medium text-gray-500 mb-3">Основная информация</h3>
-          <div class="space-y-4">
-            <div><span class="text-gray-500">Суд:</span> ${caseData.court_name || '—'}</div>
-            <div><span class="text-gray-500">Дата заседания:</span> ${caseData.next_hearing_date || '—'}</div>
-            <div><span class="text-gray-500">Статус:</span> ${caseData.status}</div>
-          </div>
-        </div>
-        
-        <div>
-          <h3 class="font-medium text-gray-500 mb-3">Документы</h3>
-          <div class="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-400">
-            <i class="fas fa-cloud-upload-alt text-3xl mb-3"></i>
-            <p>Перетащите документы сюда</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-12">
-        <h3 class="font-medium text-gray-500 mb-4">Заметки и таймлайн</h3>
-        <textarea class="w-full h-40 border border-gray-200 rounded-2xl p-5" placeholder="Напишите заметку..."></textarea>
-      </div>
-    </div>
-  `;
+async function openDetail(id) {
+  const res = await fetch(`${apiBase}/cases/${id}`);
+  currentCase = await res.json();
+  
+  document.getElementById('detail-panel').classList.remove('hidden');
+  document.getElementById('detail-title').textContent = currentCase.case_number;
+  
+  switchTab(0);
 }
 
 function closeDetail() {
-  document.getElementById('case-detail').classList.add('hidden');
+  document.getElementById('detail-panel').classList.add('hidden');
 }
 
-function openNewCaseModal() {
-  document.getElementById('new-modal').classList.remove('hidden');
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.remove('tab-active'));
+  document.getElementById(`tab-${tab}`).classList.add('tab-active');
+
+  const content = document.getElementById('tab-content');
+
+  if (tab === 0) {
+    content.innerHTML = `
+      <div class="space-y-8">
+        <div>
+          <h3 class="text-lg font-semibold mb-4">Основная информация</h3>
+          <div class="grid grid-cols-2 gap-6">
+            <div><strong>Клиент:</strong> ${currentCase.client_name}</div>
+            <div><strong>Суд:</strong> ${currentCase.court_name || '—'}</div>
+            <div><strong>Дата заседания:</strong> ${currentCase.next_hearing_date || '—'}</div>
+            <div><strong>Статус:</strong> ${currentCase.status}</div>
+          </div>
+        </div>
+      </div>`;
+  } 
+  else if (tab === 1) {
+    content.innerHTML = `
+      <div>
+        <h3 class="font-semibold mb-4">Документы по делу</h3>
+        <div class="border-2 border-dashed border-gray-300 rounded-3xl p-12 text-center">
+          <i class="fas fa-cloud-upload-alt text-5xl text-gray-300 mb-4"></i>
+          <p class="text-gray-500">Перетащите файлы сюда или нажмите для загрузки</p>
+        </div>
+        <div class="mt-6 text-sm text-gray-400">Пока документов нет</div>
+      </div>`;
+  } 
+  else if (tab === 2) {
+    content.innerHTML = `<p class="text-gray-400">Раздел контактов в разработке</p>`;
+  } 
+  else if (tab === 3) {
+    content.innerHTML = `<p class="text-gray-400">Раздел задач в разработке</p>`;
+  }
 }
 
-function createCase() {
-  alert("Дело создано! (функционал в разработке)");
-  document.getElementById('new-modal').classList.add('hidden');
-  loadCases();
+function newCase() {
+  alert("Функция создания нового дела будет добавлена в следующей версии");
 }
 
-// Запуск
+// Инициализация
 window.onload = loadCases;
 </script>
 </body>
