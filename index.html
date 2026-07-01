@@ -8,221 +8,144 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <style>
     body { font-family: 'Inter', system-ui, sans-serif; }
-    .case-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-    .case-card:hover { transform: translateY(-6px); box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+    .notion-page { max-width: 900px; margin: 0 auto; }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-100">
 
-<div class="max-w-7xl mx-auto p-6">
-  <!-- Header -->
-  <div class="flex justify-between items-center mb-8">
-    <div>
-      <p class="text-blue-600 text-sm font-medium tracking-widest">РЕЕСТР • ДЕЛА В РАБОТЕ</p>
-      <h1 class="text-4xl font-semibold text-gray-900">Судебные дела</h1>
+<div class="flex h-screen">
+  <!-- Sidebar -->
+  <div class="w-72 bg-white border-r border-gray-200 p-4 flex flex-col">
+    <h1 class="font-semibold text-xl mb-8 px-3">Судебные дела</h1>
+    
+    <div class="space-y-1 mb-8">
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-600 font-medium">
+        <i class="fas fa-folder"></i> Все дела
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100">
+        <i class="fas fa-calendar"></i> Календарь
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-100">
+        <i class="fas fa-archive"></i> Архив
+      </a>
     </div>
-    <button onclick="openModal()" 
-            class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-medium flex items-center gap-3">
+
+    <button onclick="openNewCaseModal()" 
+            class="w-full bg-blue-600 text-white py-3 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-700">
       <i class="fas fa-plus"></i> Новое дело
     </button>
   </div>
 
-  <!-- API Bar -->
-  <div class="bg-white p-4 rounded-3xl border border-gray-100 mb-8 flex items-center gap-4">
-    <div id="apiDot" class="w-4 h-4 rounded-full bg-red-500"></div>
-    <span class="font-medium text-gray-600">API:</span>
-    <input id="apiUrl" value="https://lawyer-cases.onrender.com" class="flex-1 bg-transparent focus:outline-none">
-    <button onclick="checkApi()" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 rounded-2xl text-sm font-medium">Проверить</button>
+  <!-- Main Content -->
+  <div class="flex-1 overflow-auto">
+    <div class="max-w-4xl mx-auto p-8">
+      <h2 class="text-3xl font-semibold mb-8">Все дела</h2>
+
+      <div id="cases-list" class="space-y-3"></div>
+    </div>
   </div>
 
-  <!-- Dashboard -->
-  <div id="dashboard" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
-
-  <!-- Filters -->
-  <div class="flex flex-col md:flex-row gap-4 mb-8">
-    <input id="searchInput" type="text" placeholder="Поиск по клиенту или номеру дела..." 
-           oninput="loadCases()" 
-           class="flex-1 px-6 py-4 bg-white border border-gray-200 rounded-3xl focus:outline-none focus:border-blue-500 text-lg">
-    <select id="statusFilter" onchange="loadCases()" 
-            class="px-6 py-4 bg-white border border-gray-200 rounded-3xl focus:outline-none">
-      <option value="">Все статусы</option>
-      <option value="open">В производстве</option>
-      <option value="in_court">В суде</option>
-      <option value="appeal">Обжалование</option>
-      <option value="suspended">Приостановлено</option>
-      <option value="closed">Завершено</option>
-    </select>
+  <!-- Right Sidebar / Preview -->
+  <div id="case-detail" class="w-96 bg-white border-l border-gray-200 hidden overflow-auto">
+    <div class="p-6 sticky top-0 bg-white border-b">
+      <button onclick="closeDetail()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times text-xl"></i>
+      </button>
+    </div>
+    <div id="detail-content" class="p-6"></div>
   </div>
-
-  <!-- Cases Grid -->
-  <div id="list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 </div>
 
-<!-- Modal -->
-<div id="overlay" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-  <div class="bg-white rounded-3xl max-w-md w-full max-h-[90vh] overflow-auto">
-    <div class="p-8">
-      <h2 id="modalTitle" class="text-2xl font-semibold mb-6">Новое дело</h2>
-      <input type="hidden" id="caseId">
-
-      <div class="space-y-6">
-        <div>
-          <label class="block text-sm text-gray-500 mb-1">Номер дела *</label>
-          <input id="f_case_number" type="text" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-        </div>
-        <div>
-          <label class="block text-sm text-gray-500 mb-1">Клиент *</label>
-          <input id="f_client_name" type="text" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-500 mb-1">Суд</label>
-            <input id="f_court_name" type="text" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-          </div>
-          <div>
-            <label class="block text-sm text-gray-500 mb-1">Судья</label>
-            <input id="f_judge_name" type="text" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm text-gray-500 mb-1">Статус</label>
-            <select id="f_status" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-              <option value="open">В производстве</option>
-              <option value="in_court">В суде</option>
-              <option value="appeal">Обжалование</option>
-              <option value="suspended">Приостановлено</option>
-              <option value="closed">Завершено</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm text-gray-500 mb-1">Дата заседания</label>
-            <input id="f_next_hearing_date" type="date" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-          </div>
-        </div>
-        <div>
-          <label class="block text-sm text-gray-500 mb-1">Сумма иска (₸)</label>
-          <input id="f_claim_amount" type="number" class="w-full px-5 py-3 border border-gray-200 rounded-2xl">
-        </div>
-      </div>
-
-      <div class="mt-8 flex gap-3">
-        <button onclick="saveCase()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-medium">Сохранить</button>
-        <button onclick="closeModal()" class="flex-1 bg-gray-100 py-4 rounded-2xl font-medium">Отмена</button>
-      </div>
-    </div>
+<!-- New Case Modal -->
+<div id="new-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center">
+  <div class="bg-white rounded-3xl p-8 w-full max-w-md">
+    <h3 class="text-2xl font-semibold mb-6">Новое судебное дело</h3>
+    <!-- Форма здесь -->
+    <button onclick="createCase()" class="w-full bg-blue-600 text-white py-4 rounded-2xl">Создать дело</button>
   </div>
 </div>
 
 <script>
 let apiBase = "https://lawyer-cases.onrender.com";
-
-const statusMap = {
-  open: { label: "В производстве", color: "bg-amber-100 text-amber-700" },
-  in_court: { label: "В суде", color: "bg-blue-100 text-blue-700" },
-  appeal: { label: "Обжалование", color: "bg-purple-100 text-purple-700" },
-  suspended: { label: "Приостановлено", color: "bg-gray-100 text-gray-700" },
-  closed: { label: "Завершено", color: "bg-emerald-100 text-emerald-700" }
-};
-
-async function checkApi() {
-  const dot = document.getElementById('apiDot');
-  try {
-    const res = await fetch(apiBase + '/');
-    dot.className = res.ok ? 'w-4 h-4 rounded-full bg-emerald-500' : 'w-4 h-4 rounded-full bg-red-500';
-    if (res.ok) loadCases();
-  } catch(e) {
-    dot.className = 'w-4 h-4 rounded-full bg-red-500';
-  }
-}
+let currentCases = [];
 
 async function loadCases() {
-  const search = document.getElementById('searchInput').value.trim();
-  const status = document.getElementById('statusFilter').value;
-  
-  const params = new URLSearchParams();
-  if (status) params.append('status', status);
-  if (search) {
-    params.append('client_name', search);
-    params.append('case_number', search);
-  }
-
   try {
-    const res = await fetch(`${apiBase}/cases?${params}`);
-    const data = await res.json();
-    renderCases(data.items || data);
-    renderDashboard();
-  } catch(e) {
-    document.getElementById('list').innerHTML = `<p class="text-center text-red-500 py-12">Ошибка подключения к серверу</p>`;
-  }
+    const res = await fetch(apiBase + '/cases');
+    currentCases = await res.json();
+    renderCases();
+  } catch(e) {}
 }
 
-function renderCases(cases) {
-  const container = document.getElementById('list');
-  if (!cases || cases.length === 0) {
-    container.innerHTML = `<p class="col-span-full text-center py-20 text-gray-400 text-lg">Дел пока нет</p>`;
-    return;
-  }
-
-  container.innerHTML = cases.map(c => `
-    <div onclick="openModal(${JSON.stringify(c)})" class="case-card bg-white border border-gray-100 rounded-3xl p-6 cursor-pointer">
-      <div class="flex justify-between items-start mb-4">
-        <div>
-          <span class="text-xs font-mono text-gray-400">№ ${c.case_number}</span>
-          <p class="font-semibold text-lg mt-1">${c.client_name}</p>
-        </div>
-        <span class="${statusMap[c.status].color} text-xs font-medium px-3 py-1 rounded-full">
-          ${statusMap[c.status].label}
-        </span>
+function renderCases() {
+  const container = document.getElementById('cases-list');
+  container.innerHTML = currentCases.map(c => `
+    <div onclick="openCaseDetail(${c.id})" class="bg-white border border-gray-200 rounded-2xl p-5 hover:border-blue-300 cursor-pointer flex gap-4">
+      <div class="flex-1">
+        <div class="font-medium">${c.case_number}</div>
+        <div class="text-lg font-semibold mt-1">${c.client_name}</div>
+        ${c.next_hearing_date ? `<div class="text-sm text-gray-500 mt-2">Заседание: ${c.next_hearing_date}</div>` : ''}
       </div>
-      ${c.next_hearing_date ? `<p class="text-sm text-gray-500">Заседание: ${c.next_hearing_date}</p>` : ''}
-      ${c.claim_amount ? `<p class="text-lg font-medium text-emerald-600 mt-2">${c.claim_amount.toLocaleString('ru-RU')} ₸</p>` : ''}
+      <div class="text-right">
+        <span class="inline-block px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-700">${c.status}</span>
+      </div>
     </div>
   `).join('');
 }
 
-async function renderDashboard() {
-  try {
-    const res = await fetch(apiBase + '/stats');
-    const stats = await res.json();
-    // Здесь можно расширить дашборд
-    document.getElementById('dashboard').innerHTML = `
-      <div class="bg-white rounded-3xl p-6">
-        <p class="text-gray-500 text-sm">Всего дел</p>
-        <p class="text-4xl font-semibold mt-2">${stats.total_cases || 0}</p>
+function openCaseDetail(id) {
+  const caseData = currentCases.find(c => c.id === id);
+  if (!caseData) return;
+
+  document.getElementById('case-detail').classList.remove('hidden');
+  document.getElementById('detail-content').innerHTML = `
+    <div class="notion-page">
+      <h1 class="text-4xl font-semibold mb-2">${caseData.case_number}</h1>
+      <p class="text-2xl text-gray-600">${caseData.client_name}</p>
+      
+      <div class="mt-10 grid grid-cols-2 gap-8">
+        <div>
+          <h3 class="font-medium text-gray-500 mb-3">Основная информация</h3>
+          <div class="space-y-4">
+            <div><span class="text-gray-500">Суд:</span> ${caseData.court_name || '—'}</div>
+            <div><span class="text-gray-500">Дата заседания:</span> ${caseData.next_hearing_date || '—'}</div>
+            <div><span class="text-gray-500">Статус:</span> ${caseData.status}</div>
+          </div>
+        </div>
+        
+        <div>
+          <h3 class="font-medium text-gray-500 mb-3">Документы</h3>
+          <div class="border border-dashed border-gray-300 rounded-2xl p-8 text-center text-gray-400">
+            <i class="fas fa-cloud-upload-alt text-3xl mb-3"></i>
+            <p>Перетащите документы сюда</p>
+          </div>
+        </div>
       </div>
-      <div class="bg-white rounded-3xl p-6">
-        <p class="text-gray-500 text-sm">В работе</p>
-        <p class="text-4xl font-semibold mt-2 text-blue-600">${stats.open_cases || 0}</p>
+
+      <div class="mt-12">
+        <h3 class="font-medium text-gray-500 mb-4">Заметки и таймлайн</h3>
+        <textarea class="w-full h-40 border border-gray-200 rounded-2xl p-5" placeholder="Напишите заметку..."></textarea>
       </div>
-    `;
-  } catch(e) {}
+    </div>
+  `;
 }
 
-function openModal(c = null) {
-  document.getElementById('overlay').classList.remove('hidden');
-  if (c) {
-    document.getElementById('modalTitle').textContent = `Дело №${c.case_number}`;
-    document.getElementById('caseId').value = c.id;
-    // Заполнение остальных полей...
-  }
+function closeDetail() {
+  document.getElementById('case-detail').classList.add('hidden');
 }
 
-function closeModal() {
-  document.getElementById('overlay').classList.add('hidden');
+function openNewCaseModal() {
+  document.getElementById('new-modal').classList.remove('hidden');
 }
 
-async function saveCase() {
-  // Логика сохранения (можно доработать)
-  alert("Сохранено! (функция в разработке)");
-  closeModal();
+function createCase() {
+  alert("Дело создано! (функционал в разработке)");
+  document.getElementById('new-modal').classList.add('hidden');
   loadCases();
 }
 
 // Запуск
-window.onload = () => {
-  checkApi();
-};
+window.onload = loadCases;
 </script>
 </body>
 </html>
