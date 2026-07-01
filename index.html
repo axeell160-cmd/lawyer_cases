@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Реестр судебных дел</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+  :root{
+    --bg:#ffffff; --sidebar:#fbfbfa; --text:#37352f; --muted:#9b9a97;
+    --border:#e9e9e7; --accent:#2383e2; --accent-soft:#e7f3fe;
+    --danger:#eb5757; --success:#0f9d58; --warn:#d9730d;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--text);background:var(--bg);}
+  ::-webkit-scrollbar{width:10px;height:10px;}
+  ::-webkit-scrollbar-thumb{background:#ddd;border-radius:8px;}
+  ::-webkit-scrollbar-thumb:hover{background:#ccc;}
+
+  .app{display:flex;height:100vh;overflow:hidden;}
+
+  /* Sidebar */
+  .sidebar{width:260px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:18px 14px;}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px 8px;}
+  .brand-icon{width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#2383e2,#0f62c4);
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;}
+  .brand-name{font-weight:700;font-size:15px;letter-spacing:-0.01em;}
+  .new-btn{width:100%;background:var(--accent);color:#fff;border:none;padding:9px 12px;border-radius:8px;
+    font-size:13.5px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+    transition:background .15s;margin-bottom:16px;}
+  .new-btn:hover{background:#0f6fc9;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;font-size:13.5px;
+    color:#5f5e5b;cursor:pointer;transition:background .12s;}
+  .nav-item:hover{background:#eeeeec;}
+  .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600;}
+  .nav-section{margin-top:18px;padding:0 10px;font-size:11px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.04em;}
+  .case-mini-list{margin-top:6px;display:flex;flex-direction:column;gap:1px;overflow-y:auto;flex:1;}
+  .case-mini{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:7px;font-size:12.5px;
+    color:#6b6a67;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .case-mini:hover{background:#eeeeec;}
+  .case-mini.active{background:var(--accent-soft);color:var(--accent);}
+  .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+  /* Main */
+  .main{flex:1;overflow-y:auto;position:relative;background:#fff;}
+  .list-view{padding:40px 48px;max-width:1100px;margin:0 auto;}
+  .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;}
+  .list-header h2{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin:0;}
+  .list-sub{color:var(--muted);font-size:13.5px;margin-top:4px;}
+  .search-box{position:relative;margin-bottom:22px;}
+  .search-box input{width:100%;padding:9px 12px 9px 36px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;}
+  .search-box i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+  .case-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:18px;cursor:pointer;
+    transition:.15s;}
+  .case-card:hover{border-color:#d5d5d2;box-shadow:0 4px 14px rgba(0,0,0,.06);transform:translateY(-2px);}
+  .card-top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .case-num{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted);}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.02em;}
+  .badge-open{background:#e7f3fe;color:#2383e2;}
+  .badge-progress{background:#fef3e0;color:#d9730d;}
+  .badge-closed{background:#f1f1ef;color:#6b6a67;}
+  .badge-appeal{background:#f4e9fb;color:#8b3fc9;}
+  .case-client{font-weight:700;font-size:17px;margin-top:8px;}
+  .case-meta{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;margin-top:10px;}
+  .case-meta i{width:13px;}
+  .empty-state{text-align:center;padding:80px 20px;color:var(--muted);}
+  .empty-state i{font-size:34px;margin-bottom:14px;color:#d8d8d5;}
+
+  /* Case frame (full page) */
+  .frame{display:none;padding:0 0 60px 0;}
+  .frame.active{display:block;}
+  .list-view.hidden{display:none;}
+  .frame-top{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--border);padding:14px 48px;
+    display:flex;align-items:center;justify-content:space-between;z-index:5;}
+  .back-btn{display:flex;align-items:center;gap:8px;color:#6b6a67;font-size:13px;font-weight:500;cursor:pointer;
+    padding:6px 10px;border-radius:7px;}
+  .back-btn:hover{background:#f1f1ef;}
+  .frame-header{padding:36px 48px 0 48px;max-width:900px;}
+  .title-edit{font-size:32px;font-weight:800;letter-spacing:-0.02em;outline:none;border-radius:6px;padding:2px 6px;
+    margin-left:-6px;}
+  .title-edit:hover{background:#f7f7f5;}
+  .title-edit:focus{background:#fbfbfa;box-shadow:0 0 0 2px var(--accent-soft);}
+  .subtitle-edit{font-size:16px;color:#6b6a67;outline:none;border-radius:6px;padding:2px 6px;margin-left:-6px;
+    margin-top:6px;display:inline-block;}
+  .subtitle-edit:hover{background:#f7f7f5;}
+  .subtitle-edit:focus{background:#fbfbfa;box-shadow:0 0 0 2px var(--accent-soft);}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:18px;font-size:13px;color:#6b6a67;}
+  .meta-item{display:flex;align-items:center;gap:8px;}
+  .meta-item i{width:14px;color:var(--muted);}
+  .meta-item [contenteditable], .meta-item select, .meta-item input{outline:none;border:none;background:transparent;
+    font-size:13px;color:var(--text);border-radius:5px;padding:2px 5px;font-family:inherit;}
+  .meta-item [contenteditable]:hover, .meta-item select:hover{background:#f1f1ef;cursor:text;}
+  .meta-item [contenteditable]:focus{background:#fbfbfa;box-shadow:0 0 0 2px var(--accent-soft);}
+
+  .tabs{display:flex;gap:2px;padding:0 48px;margin-top:26px;border-bottom:1px solid var(--border);}
+  .tab-btn{padding:11px 16px;font-size:13.5px;font-weight:500;color:#6b6a67;cursor:pointer;border:none;background:none;
+    border-bottom:2px solid transparent;display:flex;align-items:center;gap:7px;margin-bottom:-1px;}
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--text);font-weight:700;border-bottom-color:var(--accent);}
+  .tab-body{padding:28px 48px;max-width:900px;}
+
+  /* form-ish elements reused across tabs */
+  .field-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+  .card-box{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:#fbfbfa;}
+  .btn{border:none;border-radius:7px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;
+    align-items:center;gap:7px;}
+  .btn-accent{background:var(--accent);color:#fff;}
+  .btn-accent:hover{background:#0f6fc9;}
+  .btn-ghost{background:#f1f1ef;color:#37352f;}
+  .btn-ghost:hover{background:#e6e6e3;}
+  .btn-danger-ghost{background:transparent;color:var(--danger);}
+  .btn-danger-ghost:hover{background:#fdeaea;}
+  .row-input{border:1px solid var(--border);border-radius:7px;padding:8px 11px;font-size:13px;font-family:inherit;}
+
+  /* Documents */
+  .dropzone{border:2px dashed var(--border);border-radius:var(--radius);padding:30px;text-align:center;color:var(--muted);
+    cursor:pointer;transition:.15s;}
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--accent);}
+  .file-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;
+    margin-top:8px;}
+  .file-icon{width:34px;height:34px;border-radius:8px;background:#eef4fc;color:var(--accent);display:flex;
+    align-items:center;justify-content:center;flex-shrink:0;}
+  .file-name{font-size:13px;font-weight:600;}
+  .file-meta{font-size:11.5px;color:var(--muted);}
+
+  /* Calendar */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .cal-nav-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;}
+  .cal-nav-btn:hover{background:#f1f1ef;}
+  .cal-title{font-weight:700;font-size:14.5px;text-transform:capitalize;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-dow{text-align:center;font-size:10.5px;font-weight:700;color:var(--muted);padding:4px 0;text-transform:uppercase;}
+  .cal-cell{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:12.5px;color:#b9b8b5;position:relative;}
+  .cal-cell.in-month{color:var(--text);}
+  .cal-cell.today{background:var(--accent-soft);color:var(--accent);font-weight:700;}
+  .cal-cell .ev-dot{width:4px;height:4px;border-radius:50%;background:var(--warn);margin-top:2px;}
+  .cal-cell.today .ev-dot{background:var(--accent);}
+  .event-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;margin-top:8px;}
+  .event-date-chip{background:#fef3e0;color:var(--warn);font-weight:700;font-size:11.5px;padding:4px 9px;border-radius:7px;
+    text-align:center;min-width:56px;}
+
+  /* Notes */
+  #notes-textarea{width:100%;min-height:340px;border:none;outline:none;resize:vertical;font-size:14.5px;line-height:1.7;
+    font-family:inherit;color:var(--text);background:transparent;}
+  .save-indicator{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .save-indicator i{color:var(--success);}
+
+  /* Tasks */
+  .task-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid #f1f1ef;}
+  .task-row:hover .task-del{opacity:1;}
+  .task-check{width:17px;height:17px;border-radius:5px;border:1.5px solid #d5d5d2;flex-shrink:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;}
+  .task-check.done{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .task-text{flex:1;font-size:13.5px;}
+  .task-text.done{color:var(--muted);text-decoration:line-through;}
+  .task-del{opacity:0;color:var(--muted);cursor:pointer;transition:.12s;}
+  .task-del:hover{color:var(--danger);}
+
+  /* Contacts */
+  .contact-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border);border-radius:9px;margin-top:8px;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:#e7f3fe;color:var(--accent);font-weight:700;font-size:13px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(15,15,15,.55);display:none;align-items:center;justify-content:center;z-index:100;}
+  .modal-overlay.show{display:flex;}
+  .modal-box{background:#fff;border-radius:16px;width:100%;max-width:420px;margin:16px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal-box h3{margin:0 0 18px 0;font-size:19px;font-weight:800;}
+  .field-group{margin-bottom:14px;}
+  .field-group label{font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:5px;}
+  .field-group input, .field-group select{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:13.5px;font-family:inherit;}
+
+  /* Toast */
+  #toast{position:fixed;bottom:22px;right:22px;background:#1f1f1e;color:#fff;padding:10px 16px;border-radius:9px;
+    font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(8px);
+    transition:.2s;pointer-events:none;z-index:200;}
+  #toast.show{opacity:1;transform:translateY(0);}
+  #toast i{color:var(--success);}
+  #toast.warn i{color:var(--warn);}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed;left:-260px;transition:.2s;z-index:50;height:100vh;}
+    .sidebar.open{left:0;}
+    .list-view,.tab-body,.frame-header,.frame-top{padding-left:18px;padding-right:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-icon"><i class="fas fa-scale-balanced"></i></div><div class="brand-name">Реестр дел</div></div>
+    <button class="new-btn" onclick="openNewCaseModal()"><i class="fas fa-plus"></i> Новое дело</button>
+    <div class="nav-item active" onclick="backToList()"><i class="fas fa-folder-open"></i> Все дела</div>
+    <div class="nav-section">Дела</div>
+    <div class="case-mini-list" id="case-mini-list"></div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- LIST VIEW -->
+    <div class="list-view" id="list-view">
+      <div class="list-header">
+        <div>
+          <h2>Все дела</h2>
+          <div class="list-sub" id="cases-count"></div>
+        </div>
+      </div>
+      <div class="search-box"><i class="fas fa-search"></i>
+        <input id="search-input" placeholder="Поиск по номеру дела или клиенту..." oninput="renderCasesList()">
+      </div>
+      <div id="cases-list" class="grid"></div>
+    </div>
+
+    <!-- CASE FRAME -->
+    <div class="frame" id="frame">
+      <div class="frame-top">
+        <div class="back-btn" onclick="backToList()"><i class="fas fa-arrow-left"></i> Все дела</div>
+        <button class="btn btn-danger-ghost" onclick="deleteCurrentCase()"><i class="fas fa-trash"></i> Удалить дело</button>
+      </div>
+      <div class="frame-header">
+        <div class="title-edit" contenteditable="true" id="f-title" onblur="saveField('case_number', this.innerText)"></div>
+        <div class="subtitle-edit" contenteditable="true" id="f-client" onblur="saveField('client_name', this.innerText)"></div>
+        <div class="meta-row">
+          <div class="meta-item"><i class="fas fa-landmark"></i>
+            <span contenteditable="true" id="f-court" onblur="saveField('court_name', this.innerText)"></span></div>
+          <div class="meta-item"><i class="fas fa-calendar-day"></i>
+            <input type="date" id="f-date" onchange="saveField('next_hearing_date', this.value)"></div>
+          <div class="meta-item"><i class="fas fa-circle-dot"></i>
+            <select id="f-status" onchange="saveField('status', this.value)">
+              <option value="open">Открыто</option>
+              <option value="progress">В процессе</option>
+              <option value="appeal">Апелляция</option>
+              <option value="closed">Закрыто</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn" data-tab="info" onclick="switchTab('info')"><i class="fas fa-circle-info"></i> Информация</button>
+        <button class="tab-btn" data-tab="docs" onclick="switchTab('docs')"><i class="fas fa-paperclip"></i> Документы</button>
+        <button class="tab-btn" data-tab="cal" onclick="switchTab('cal')"><i class="fas fa-calendar"></i> Календарь</button>
+        <button class="tab-btn" data-tab="notes" onclick="switchTab('notes')"><i class="fas fa-note-sticky"></i> Заметки</button>
+        <button class="tab-btn" data-tab="tasks" onclick="switchTab('tasks')"><i class="fas fa-list-check"></i> Задачи</button>
+        <button class="tab-btn" data-tab="contacts" onclick="switchTab('contacts')"><i class="fas fa-address-book"></i> Контакты</button>
+      </div>
+      <div class="tab-body" id="tab-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- New Case Modal -->
+<div class="modal-overlay" id="new-modal">
+  <div class="modal-box">
+    <h3>Новое дело</h3>
+    <div class="field-group"><label>Номер дела *</label><input id="new_number" placeholder="А40-12345/2026"></div>
+    <div class="field-group"><label>Клиент *</label><input id="new_client" placeholder="ФИО клиента"></div>
+    <div class="field-group"><label>Суд</label><input id="new_court" placeholder="Арбитражный суд г. Москвы"></div>
+    <div class="field-group"><label>Дата заседания</label><input id="new_date" type="date"></div>
+    <div style="display:flex;gap:10px;margin-top:6px;">
+      <button class="btn btn-accent" style="flex:1;justify-content:center;" onclick="createCase()">Создать дело</button>
+      <button class="btn btn-ghost" style="flex:1;justify-content:center;" onclick="closeNewModal()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><i class="fas fa-circle-check"></i><span id="toast-text"></span></div>
+
+<script>
+const apiBase = "https://lawyer-cases.onrender.com";
+let cases = [];
+let currentCaseId = null;
+let currentTab = 'info';
+let calMonth, calYear;
+
+const STATUS_LABEL = {open:'Открыто', progress:'В процессе', appeal:'Апелляция', closed:'Закрыто'};
+const STATUS_BADGE = {open:'badge-open', progress:'badge-progress', appeal:'badge-appeal', closed:'badge-closed'};
+
+/* ---------- bootstrap / data loading ---------- */
+
+function blankExtras(){
+  return { notes:'', attachments:[], events:[], tasks:[], contacts:[] };
+}
+
+async function loadCases(){
+  try{
+    const res = await fetch(`${apiBase}/cases`);
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    cases = data.map(c => ({
+      id: c.id, case_number: c.case_number, client_name: c.client_name,
+      court_name: c.court_name || '', next_hearing_date: c.next_hearing_date || '',
+      status: c.status || 'open', ...blankExtras()
+    }));
+  }catch(e){
+    console.warn('Сервер недоступен, используются локальные демо-данные', e);
+    cases = seedCases();
+    toast('Нет соединения с сервером — показаны локальные данные', 'warn');
+  }
+  renderCasesList();
+  renderMiniList();
+}
+
+function seedCases(){
+  return [
+    { id:1, case_number:'А40-88213/2026', client_name:'ООО «Вектор Строй»', court_name:'Арбитражный суд г. Москвы',
+      next_hearing_date:'2026-07-14', status:'progress', notes:'Клиент настаивает на мировом соглашении. Подготовить проект к пятнице.',
+      attachments:[], events:[{id:cryptoId(), title:'Предварительное заседание', date:'2026-07-14', type:'заседание'}],
+      tasks:[{id:cryptoId(), text:'Подать ходатайство об отложении', done:false}, {id:cryptoId(), text:'Собрать доказательства оплаты', done:true}],
+      contacts:[{id:cryptoId(), name:'Иванов И.И.', role:'Директор клиента', phone:'+7 900 123-45-67', email:'ivanov@vector.ru'}] },
+    { id:2, case_number:'2-4521/2026', client_name:'Петрова А.С.', court_name:'Мещанский районный суд',
+      next_hearing_date:'2026-07-20', status:'open', notes:'', attachments:[], events:[], tasks:[], contacts:[] }
+  ];
+}
+
+function cryptoId(){ return Math.random().toString(36).slice(2,10); }
+
+/* ---------- list view ---------- */
+
+function renderMiniList(){
+  const el = document.getElementById('case-mini-list');
+  el.innerHTML = cases.map(c => `
+    <div class="case-mini ${c.id===currentCaseId?'active':''}" onclick="openCase(${c.id})">
+      <span class="dot" style="background:${statusColor(c.status)}"></span>${escapeHtml(c.client_name)}
+    </div>`).join('');
+}
+
+function statusColor(s){
+  return {open:'#2383e2', progress:'#d9730d', appeal:'#8b3fc9', closed:'#9b9a97'}[s] || '#9b9a97';
+}
+
+function renderCasesList(){
+  const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+  const filtered = cases.filter(c => (c.case_number+c.client_name).toLowerCase().includes(q));
+  document.getElementById('cases-count').textContent = `${filtered.length} из ${cases.length} дел`;
+  const container = document.getElementById('cases-list');
+
+  if(filtered.length === 0){
+    container.innerHTML = '';
+    container.parentElement.querySelector('.empty-state')?.remove();
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = `<i class="fas fa-folder-open"></i><div>Дела не найдены</div>`;
+    container.after(empty);
+    return;
+  }
+  document.querySelector('.empty-state')?.remove();
+
+  container.innerHTML = filtered.map(c => `
+    <div class="case-card" onclick="openCase(${c.id})">
+      <div class="card-top">
+        <div class="case-num">${escapeHtml(c.case_number)}</div>
+        <div class="badge ${STATUS_BADGE[c.status]}">${STATUS_LABEL[c.status]}</div>
+      </div>
+      <div class="case-client">${escapeHtml(c.client_name)}</div>
+      ${c.court_name ? `<div class="case-meta"><i class="fas fa-landmark"></i>${escapeHtml(c.court_name)}</div>` : ''}
+      ${c.next_hearing_date ? `<div class="case-meta"><i class="fas fa-calendar-day"></i>Заседание: ${formatDate(c.next_hearing_date)}</div>` : ''}
+    </div>`).join('');
+}
+
+/* ---------- case frame ---------- */
+
+function getCase(id){ return cases.find(c => c.id === id); }
+function currentCase(){ return getCase(currentCaseId); }
+
+function openCase(id){
+  currentCaseId = id;
+  const c = getCase(id);
+  document.getElementById('list-view').classList.add('hidden');
+  document.getElementById('frame').classList.add('active');
+
+  document.getElementById('f-title').innerText = c.case_number;
+  document.getElementById('f-client').innerText = c.client_name;
+  document.getElementById('f-court').innerText = c.court_name;
+  document.getElementById('f-date').value = c.next_hearing_date || '';
+  document.getElementById('f-status').value = c.status;
+
+  renderMiniList();
+  switchTab('info');
+}
+
+function backToList(){
+  currentCaseId = null;
+  document.getElementById('frame').classList.remove('active');
+  document.getElementById('list-view').classList.remove('hidden');
+  renderMiniList();
+  renderCasesList();
+}
+
+async function saveField(field, value){
+  const c = currentCase();
+  if(!c) return;
+  c[field] = value;
+  renderMiniList();
+  renderCasesList();
+  try{
+    const res = await fetch(`${apiBase}/cases/${c.id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({[field]: value})
+    });
+    if(!res.ok) throw new Error();
+    toast('Сохранено');
+  }catch(e){
+    toast('Сохранено локально (нет связи с сервером)', 'warn');
+  }
+}
+
+async function deleteCurrentCase(){
+  const c = currentCase();
+  if(!c) return;
+  if(!confirm(`Удалить дело ${c.case_number}? Это действие необратимо.`)) return;
+  try{ await fetch(`${apiBase}/cases/${c.id}`, {method:'DELETE'}); }catch(e){}
+  cases = cases.filter(x => x.id !== c.id);
+  backToList();
+  toast('Дело удалено');
+}
+
+/* ---------- tabs ---------- */
+
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const body = document.getElementById('tab-body');
+  const c = currentCase();
+  if(!c) return;
+  if(tab === 'info') body.innerHTML = renderInfoTab(c);
+  if(tab === 'docs') body.innerHTML = renderDocsTab(c);
+  if(tab === 'cal'){ calMonth = new Date().getMonth(); calYear = new Date().getFullYear();
+    if(c.next_hearing_date){ const d = new Date(c.next_hearing_date); calMonth = d.getMonth(); calYear = d.getFullYear(); }
+    body.innerHTML = renderCalendarTab(c);
+  }
+  if(tab === 'notes') body.innerHTML = renderNotesTab(c);
+  if(tab === 'tasks') body.innerHTML = renderTasksTab(c);
+  if(tab === 'contacts') body.innerHTML = renderContactsTab(c);
+}
+
+function renderInfoTab(c){
+  return `
+    <div class="card-box">
+      <div class="field-label">Сводка</div>
+      <p style="font-size:13.5px;line-height:1.7;margin:6px 0 0 0;color:#4a4945;">
+        Дело <strong>${escapeHtml(c.case_number)}</strong> по клиенту <strong>${escapeHtml(c.client_name)}</strong>
+        рассматривается в ${c.court_name ? escapeHtml(c.court_name) : 'суде (не указан)'}.
+        Текущий статус — <strong>${STATUS_LABEL[c.status]}</strong>.
+        ${c.next_hearing_date ? `Ближайшее заседание: <strong>${formatDate(c.next_hearing_date)}</strong>.` : 'Дата заседания не назначена.'}
+      </p>
+    </div>
+    <div style="margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="card-box"><div class="field-label">Документов</div><div style="font-size:22px;font-weight:800;margin-top:4px;">${c.attachments.length}</div></div>
+      <div class="card-box"><div class="field-label">Открытых задач</div><div style="font-size:22px;font-weight:800;margin-top:4px;">${c.tasks.filter(t=>!t.done).length}</div></div>
+      <div class="card-box"><div class="field-label">Событий в календаре</div><div style="font-size:22px;font-weight:800;margin-top:4px;">${c.events.length}</div></div>
+      <div class="card-box"><div class="field-label">Контактов</div><div style="font-size:22px;font-weight:800;margin-top:4px;">${c.contacts.length}</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:var(--muted);">
+      Название дела, клиент, суд, дата и статус редактируются прямо в шапке страницы — просто кликните на значение.
+    </div>`;
+}
+
+/* ---- documents ---- */
+
+function renderDocsTab(c){
+  return `
+    <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+      <i class="fas fa-cloud-arrow-up" style="font-size:22px;"></i>
+      <div style="margin-top:8px;font-weight:600;font-size:13.5px;">Нажмите или перетащите файлы сюда</div>
+      <div style="font-size:12px;margin-top:2px;">Файлы хранятся в этой сессии браузера</div>
+    </div>
+    <input type="file" id="file-input" multiple style="display:none" onchange="handleFiles(this.files)">
+    <div id="file-list">${renderFileList(c)}</div>`;
+}
+
+function renderFileList(c){
+  if(c.attachments.length === 0) return `<div style="color:var(--muted);font-size:13px;margin-top:16px;">Вложений пока нет.</div>`;
+  return c.attachments.map(f => `
+    <div class="file-row">
+      <div class="file-icon"><i class="fas ${fileIcon(f.type)}"></i></div>
+      <div style="flex:1;min-width:0;">
+        <div class="file-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(f.name)}</div>
+        <div class="file-meta">${formatBytes(f.size)} · добавлено ${f.addedAt}</div>
+      </div>
+      <a class="btn btn-ghost" href="${f.dataUrl}" download="${escapeHtml(f.name)}"><i class="fas fa-download"></i></a>
+      <button class="btn btn-danger-ghost" onclick="removeFile('${f.id}')"><i class="fas fa-trash"></i></button>
+    </div>`).join('');
+}
+
+function fileIcon(type){
+  if(type.includes('pdf')) return 'fa-file-pdf';
+  if(type.includes('image')) return 'fa-file-image';
+  if(type.includes('word')) return 'fa-file-word';
+  if(type.includes('sheet') || type.includes('excel')) return 'fa-file-excel';
+  return 'fa-file';
+}
+
+function handleFiles(fileList){
+  const c = currentCase();
+  const files = Array.from(fileList);
+  let remaining = files.length;
+  if(remaining === 0) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      c.attachments.push({
+        id: cryptoId(), name: file.name, size: file.size, type: file.type || 'application/octet-stream',
+        dataUrl: e.target.result, addedAt: new Date().toLocaleDateString('ru-RU')
+      });
+      remaining--;
+      if(remaining === 0){
+        document.getElementById('file-list').innerHTML = renderFileList(c);
+        toast(`Загружено файлов: ${files.length}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeFile(id){
+  const c = currentCase();
+  c.attachments = c.attachments.filter(f => f.id !== id);
+  document.getElementById('file-list').innerHTML = renderFileList(c);
+}
+
+/* ---- calendar ---- */
+
+function renderCalendarTab(c){
+  return `
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="shiftMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+      <div class="cal-title" id="cal-title"></div>
+      <button class="cal-nav-btn" onclick="shiftMonth(1)"><i class="fas fa-chevron-right"></i></button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+
+    <div style="margin-top:26px;">
+      <div class="field-label">Добавить событие</div>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <input class="row-input" id="ev-title" placeholder="Название" style="flex:2;min-width:140px;">
+        <input class="row-input" id="ev-date" type="date" style="flex:1;min-width:130px;">
+        <select class="row-input" id="ev-type" style="flex:1;min-width:120px;">
+          <option>заседание</option><option>встреча</option><option>дедлайн</option>
+        </select>
+        <button class="btn btn-accent" onclick="addEvent()"><i class="fas fa-plus"></i> Добавить</button>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <div class="field-label">Ближайшие события</div>
+      <div id="event-list">${renderEventList(c)}</div>
+    </div>`;
+  }
+
+function allEventDates(c){
+  const dates = c.events.map(e => e.date);
+  if(c.next_hearing_date) dates.push(c.next_hearing_date);
+  return dates;
+}
+
+function drawCalendarGrid(){
+  const c = currentCase();
+  document.getElementById('cal-title').textContent =
+    new Date(calYear, calMonth, 1).toLocaleDateString('ru-RU', {month:'long', year:'numeric'});
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  let startOffset = firstDay.getDay() - 1; if(startOffset < 0) startOffset = 6;
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+  const todayStr = new Date().toDateString();
+  const eventDates = new Set(allEventDates(c));
+
+  const dows = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  let html = dows.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  for(let i=0;i<startOffset;i++){
+    const dayNum = daysInPrevMonth - startOffset + i + 1;
+    html += `<div class="cal-cell">${dayNum}</div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const dateObj = new Date(calYear, calMonth, d);
+    const iso = dateObj.toISOString().slice(0,10);
+    const isToday = dateObj.toDateString() === todayStr;
+    const hasEvent = eventDates.has(iso);
+    html += `<div class="cal-cell in-month ${isToday?'today':''}">${d}${hasEvent?'<div class="ev-dot"></div>':''}</div>`;
+  }
+  const totalCells = startOffset + daysInMonth;
+  const trailing = (7 - (totalCells % 7)) % 7;
+  for(let i=1;i<=trailing;i++){ html += `<div class="cal-cell">${i}</div>`; }
+
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function shiftMonth(delta){
+  calMonth += delta;
+  if(calMonth < 0){ calMonth = 11; calYear--; }
+  if(calMonth > 11){ calMonth = 0; calYear++; }
+  drawCalendarGrid();
+}
+
+function renderEventList(c){
+  const all = [...c.events];
+  if(c.next_hearing_date) all.push({id:'hearing', title:'Судебное заседание', date:c.next_hearing_date, type:'заседание', locked:true});
+  const sorted = all.filter(e=>e.date).sort((a,b)=> a.date.localeCompare(b.date));
+  if(sorted.length===0) return `<div style="color:var(--muted);font-size:13px;margin-top:8px;">Событий нет.</div>`;
+  return sorted.map(e => `
+    <div class="event-row">
+      <div class="event-date-chip">${formatDateShort(e.date)}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13.5px;">${escapeHtml(e.title)}</div>
+        <div style="font-size:11.5px;color:var(--muted);">${e.type}</div>
+      </div>
+      ${e.locked ? '' : `<button class="btn btn-danger-ghost" onclick="removeEvent('${e.id}')"><i class="fas fa-trash"></i></button>`}
+    </div>`).join('');
+}
+
+function addEvent(){
+  const title = document.getElementById('ev-title').value.trim();
+  const date = document.getElementById('ev-date').value;
+  const type = document.getElementById('ev-type').value;
+  if(!title || !date){ toast('Укажите название и дату', 'warn'); return; }
+  const c = currentCase();
+  c.events.push({id:cryptoId(), title, date, type});
+  document.getElementById('ev-title').value = '';
+  document.getElementById('ev-date').value = '';
+  drawCalendarGrid();
+  document.getElementById('event-list').innerHTML = renderEventList(c);
+  toast('Событие добавлено');
+}
+
+function removeEvent(id){
+  const c = currentCase();
+  c.events = c.events.filter(e => e.id !== id);
+  drawCalendarGrid();
+  document.getElementById('event-list').innerHTML = renderEventList(c);
+}
+
+/* ---- notes ---- */
+
+let notesTimer = null;
+function renderNotesTab(c){
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div class="field-label">Заметки по делу</div>
+      <div class="save-indicator" id="notes-save"><i class="fas fa-circle-check"></i> сохранено</div>
+    </div>
+    <textarea id="notes-textarea" placeholder="Начните писать заметку по делу..." oninput="onNotesInput()">${escapeHtml(c.notes)}</textarea>`;
+}
+
+function onNotesInput(){
+  const c = currentCase();
+  document.getElementById('notes-save').innerHTML = `<i class="fas fa-circle-notch fa-spin" style="color:var(--muted)"></i> сохранение...`;
+  clearTimeout(notesTimer);
+  notesTimer = setTimeout(() => {
+    c.notes = document.getElementById('notes-textarea').value;
+    document.getElementById('notes-save').innerHTML = `<i class="fas fa-circle-check"></i> сохранено`;
+  }, 500);
+}
+
+/* ---- tasks ---- */
+
+function renderTasksTab(c){
+  return `
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <input class="row-input" id="task-input" placeholder="Новая задача..." style="flex:1;" onkeydown="if(event.key==='Enter')addTask()">
+      <button class="btn btn-accent" onclick="addTask()"><i class="fas fa-plus"></i></button>
+    </div>
+    <div id="task-list">${renderTaskList(c)}</div>`;
+}
+
+function renderTaskList(c){
+  if(c.tasks.length===0) return `<div style="color:var(--muted);font-size:13px;">Задач пока нет.</div>`;
+  return c.tasks.map(t => `
+    <div class="task-row">
+      <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}')">${t.done?'<i class="fas fa-check" style="font-size:10px;"></i>':''}</div>
+      <div class="task-text ${t.done?'done':''}">${escapeHtml(t.text)}</div>
+      <i class="fas fa-trash task-del" onclick="deleteTask('${t.id}')"></i>
+    </div>`).join('');
+}
+
+function addTask(){
+  const input = document.getElementById('task-input');
+  const text = input.value.trim();
+  if(!text) return;
+  const c = currentCase();
+  c.tasks.push({id:cryptoId(), text, done:false});
+  input.value = '';
+  document.getElementById('task-list').innerHTML = renderTaskList(c);
+}
+
+function toggleTask(id){
+  const c = currentCase();
+  const t = c.tasks.find(x=>x.id===id);
+  t.done = !t.done;
+  document.getElementById('task-list').innerHTML = renderTaskList(c);
+}
+
+function deleteTask(id){
+  const c = currentCase();
+  c.tasks = c.tasks.filter(x=>x.id!==id);
+  document.getElementById('task-list').innerHTML = renderTaskList(c);
+}
+
+/* ---- contacts ---- */
+
+function renderContactsTab(c){
+  return `
+    <div class="card-box" style="margin-bottom:16px;">
+      <div class="field-label" style="margin-bottom:10px;">Новый контакт</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <input class="row-input" id="ct-name" placeholder="Имя">
+        <input class="row-input" id="ct-role" placeholder="Роль (напр. Свидетель)">
+        <input class="row-input" id="ct-phone" placeholder="Телефон">
+        <input class="row-input" id="ct-email" placeholder="Email">
+      </div>
+      <button class="btn btn-accent" style="margin-top:10px;" onclick="addContact()"><i class="fas fa-plus"></i> Добавить контакт</button>
+    </div>
+    <div id="contact-list">${renderContactList(c)}</div>`;
+}
+
+function renderContactList(c){
+  if(c.contacts.length===0) return `<div style="color:var(--muted);font-size:13px;">Контактов пока нет.</div>`;
+  return c.contacts.map(ct => `
+    <div class="contact-row">
+      <div class="avatar">${escapeHtml((ct.name||'?').charAt(0).toUpperCase())}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:13.5px;">${escapeHtml(ct.name)} ${ct.role?`<span style="color:var(--muted);font-weight:400;">· ${escapeHtml(ct.role)}</span>`:''}</div>
+        <div style="font-size:12px;color:var(--muted);">${escapeHtml(ct.phone||'')} ${ct.email?`· ${escapeHtml(ct.email)}`:''}</div>
+      </div>
+      <button class="btn btn-danger-ghost" onclick="deleteContact('${ct.id}')"><i class="fas fa-trash"></i></button>
+    </div>`).join('');
+}
+
+function addContact(){
+  const name = document.getElementById('ct-name').value.trim();
+  if(!name){ toast('Укажите имя контакта', 'warn'); return; }
+  const c = currentCase();
+  c.contacts.push({
+    id:cryptoId(), name,
+    role: document.getElementById('ct-role').value.trim(),
+    phone: document.getElementById('ct-phone').value.trim(),
+    email: document.getElementById('ct-email').value.trim()
+  });
+  ['ct-name','ct-role','ct-phone','ct-email'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('contact-list').innerHTML = renderContactList(c);
+}
+
+function deleteContact(id){
+  const c = currentCase();
+  c.contacts = c.contacts.filter(x=>x.id!==id);
+  document.getElementById('contact-list').innerHTML = renderContactList(c);
+}
+
+/* ---- calendar draw trigger after tab render ---- */
+const _origSwitchTab = switchTab;
+switchTab = function(tab){
+  _origSwitchTab(tab);
+  if(tab === 'cal') drawCalendarGrid();
+};
+
+/* ---------- new case modal ---------- */
+
+function openNewCaseModal(){ document.getElementById('new-modal').classList.add('show'); }
+function closeNewModal(){
+  document.getElementById('new-modal').classList.remove('show');
+  ['new_number','new_client','new_court','new_date'].forEach(id => document.getElementById(id).value = '');
+}
+
+async function createCase(){
+  const number = document.getElementById('new_number').value.trim();
+  const client = document.getElementById('new_client').value.trim();
+  if(!number || !client){ toast('Заполните номер дела и клиента', 'warn'); return; }
+
+  const payload = {
+    case_number: number, client_name: client,
+    court_name: document.getElementById('new_court').value.trim(),
+    next_hearing_date: document.getElementById('new_date').value || null,
+    status: 'open'
+  };
+
+  let newId = cryptoId();
+  try{
+    const res = await fetch(`${apiBase}/cases`, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    if(res.ok){ const saved = await res.json(); newId = saved.id ?? newId; }
+  }catch(e){ /* offline fallback below */ }
+
+  cases.unshift({ id:newId, ...payload, court_name: payload.court_name || '', next_hearing_date: payload.next_hearing_date || '', ...blankExtras() });
+  closeNewModal();
+  renderCasesList();
+  renderMiniList();
+  toast('Дело создано');
+}
+
+/* ---------- helpers ---------- */
+
+function escapeHtml(str){
+  return (str ?? '').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+function formatDate(iso){
+  if(!iso) return '';
+  return new Date(iso).toLocaleDateString('ru-RU', {day:'2-digit', month:'long', year:'numeric'});
+}
+function formatDateShort(iso){
+  if(!iso) return '';
+  return new Date(iso).toLocaleDateString('ru-RU', {day:'2-digit', month:'short'});
+}
+function formatBytes(bytes){
+  if(bytes < 1024) return bytes + ' Б';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' КБ';
+  return (bytes/(1024*1024)).toFixed(1) + ' МБ';
+}
+
+let toastTimer;
+function toast(msg, type=''){
+  const el = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = msg;
+  el.className = type ? `show ${type}` : 'show';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+/* drag & drop for docs tab */
+document.addEventListener('dragover', e => {
+  if(e.target.closest('#dropzone')){ e.preventDefault(); e.target.closest('#dropzone').classList.add('drag'); }
+});
+document.addEventListener('dragleave', e => {
+  if(e.target.closest('#dropzone')) e.target.closest('#dropzone').classList.remove('drag');
+});
+document.addEventListener('drop', e => {
+  const zone = e.target.closest('#dropzone');
+  if(zone){ e.preventDefault(); zone.classList.remove('drag'); handleFiles(e.dataTransfer.files); }
+});
+
+window.onload = loadCases;
+</script>
+</body>
+</html>
